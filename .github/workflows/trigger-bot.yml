@@ -1,4 +1,4 @@
-name: 5 Minute Trigger
+name: Instagram Bot Trigger
 
 on:
   # Runs every 5 minutes
@@ -15,30 +15,71 @@ jobs:
     steps:
       - name: 📋 Check workflow start
         run: |
-          echo "🚀 Starting Trigger"
+          echo "🚀 Starting Instagram bot trigger"
           echo "⏰ Time: $(date)"
           echo "🔗 Target URL: ${{ secrets.TRIGGER_END_POINT }}"
+      
+      - name: 🔍 Validate Render URL
+        run: |
+          if [ -z "${{ secrets.TRIGGER_END_POINT }}" ]; then
+            echo "❌ ERROR: TRIGGER_END_POINT secret is not set!"
+            echo "👉 Please add it in: Settings → Secrets and variables → Actions"
+            exit 1
+          fi
+          
+          if [[ "${{ secrets.TRIGGER_END_POINT }}" == *"placeholder"* ]]; then
+            echo "⚠️ WARNING: Still using placeholder URL"
+            echo "👉 Update RENDER_BOT_URL secret with your actual Render URL"
+            exit 1
+          fi
+          
+          echo "✅ RENDER_BOT_URL is configured"
       
       - name: 🤖 Trigger Render Bot Endpoint
         id: trigger
         run: |
-          response=$(curl -X POST "${{ secrets.TRIGGER_END_POINT }}" \
+          echo "📡 Sending request to Render..."
+          echo "🔗 URL: ${{ secrets.RENDER_BOT_URL }}/run-bot"
+          
+          # Make the POST request and capture both response and HTTP code
+          HTTP_CODE=$(curl -X POST "${{ secrets.RENDER_BOT_URL }}/run-bot" \
             -H "Content-Type: application/json" \
-            -w "\n%{http_code}" \
+            -o response.txt \
+            -w "%{http_code}" \
             -s \
+            --connect-timeout 30 \
             --max-time 300)
           
-          http_code=$(echo "$response" | tail -n1)
-          body=$(echo "$response" | sed '$d')
+          echo "📊 HTTP Status Code: $HTTP_CODE"
           
-          echo "📊 HTTP Status Code: $http_code"
-          echo "📄 Response Body: $body"
+          # Display response body if it exists
+          if [ -f response.txt ]; then
+            echo "📄 Response Body:"
+            cat response.txt
+            echo ""
+          fi
           
-          if [ "$http_code" -eq 200 ]; then
+          # Check status code
+          if [ "$HTTP_CODE" = "200" ]; then
             echo "✅ Bot triggered successfully!"
             exit 0
+          elif [ "$HTTP_CODE" = "000" ]; then
+            echo "❌ Failed to connect to Render endpoint"
+            echo "Possible reasons:"
+            echo "  1. Render service is not deployed yet"
+            echo "  2. Render URL is incorrect"
+            echo "  3. Network/timeout issue"
+            exit 1
+          elif [ "$HTTP_CODE" = "404" ]; then
+            echo "❌ Endpoint not found (404)"
+            echo "Make sure your Render app has the /run-bot endpoint"
+            exit 1
+          elif [ "$HTTP_CODE" = "500" ]; then
+            echo "❌ Server error (500)"
+            echo "Check Render logs for errors"
+            exit 1
           else
-            echo "❌ Bot trigger failed with status $http_code"
+            echo "❌ Request failed with status $HTTP_CODE"
             exit 1
           fi
       
@@ -47,3 +88,23 @@ jobs:
         run: |
           echo "🏁 Workflow completed at $(date)"
           echo "Status: ${{ steps.trigger.outcome }}"
+      
+      - name: 💡 Helpful Tips
+        if: failure()
+        run: |
+          echo ""
+          echo "🔧 Troubleshooting Tips:"
+          echo "================================"
+          echo "1️⃣ Make sure RENDER_BOT_URL secret is set correctly"
+          echo "   Go to: Settings → Secrets and variables → Actions"
+          echo ""
+          echo "2️⃣ Make sure Render service is deployed"
+          echo "   Check: https://dashboard.render.com"
+          echo ""
+          echo "3️⃣ Make sure the URL format is correct"
+          echo "   Should be: https://your-app-name.onrender.com"
+          echo "   (no trailing slash)"
+          echo ""
+          echo "4️⃣ First request might take 60 seconds (cold start)"
+          echo "   Render free tier sleeps after 15 mins of inactivity"
+          echo ""
