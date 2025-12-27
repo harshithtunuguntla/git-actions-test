@@ -39,10 +39,10 @@ jobs:
         id: trigger
         run: |
           echo "📡 Sending request to Render..."
-          echo "🔗 URL: ${{ secrets.RENDER_BOT_URL }}/run-bot"
+          echo "🔗 URL: ${{ secrets.TRIGGER_END_POINT }}/run-bot"
           
           # Make the POST request and capture both response and HTTP code
-          HTTP_CODE=$(curl -X POST "${{ secrets.RENDER_BOT_URL }}/run-bot" \
+          HTTP_CODE=$(curl -X POST "${{ secrets.TRIGGER_END_POINT }}/run-bot" \
             -H "Content-Type: application/json" \
             -o response.txt \
             -w "%{http_code}" \
