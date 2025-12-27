@@ -1,0 +1,49 @@
+name: 5 Minute Trigger
+
+on:
+  # Runs every 5 minutes
+  schedule:
+    - cron: '*/5 * * * *'
+  
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  trigger-bot:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📋 Check workflow start
+        run: |
+          echo "🚀 Starting Trigger"
+          echo "⏰ Time: $(date)"
+          echo "🔗 Target URL: ${{ secrets.TRIGGER_END_POINT }}"
+      
+      - name: 🤖 Trigger Render Bot Endpoint
+        id: trigger
+        run: |
+          response=$(curl -X POST "${{ secrets.TRIGGER_END_POINT }}" \
+            -H "Content-Type: application/json" \
+            -w "\n%{http_code}" \
+            -s \
+            --max-time 300)
+          
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+          
+          echo "📊 HTTP Status Code: $http_code"
+          echo "📄 Response Body: $body"
+          
+          if [ "$http_code" -eq 200 ]; then
+            echo "✅ Bot triggered successfully!"
+            exit 0
+          else
+            echo "❌ Bot trigger failed with status $http_code"
+            exit 1
+          fi
+      
+      - name: 📝 Log completion
+        if: always()
+        run: |
+          echo "🏁 Workflow completed at $(date)"
+          echo "Status: ${{ steps.trigger.outcome }}"
